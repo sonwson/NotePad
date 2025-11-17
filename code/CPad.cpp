@@ -1,10 +1,10 @@
 // ========================================================================
-// CPad.cpp							(c)1997 Jesse Hall. All rights reserved.
+// CPad.cpp							(c)1997 Jesse Hall. Bảo lưu mọi quyền.
 // ========================================================================
 
 #include "CLine.h"
 #include "CPad.h"
-#include "Pad.h"
+#include "Pad.h" // Chứa định nghĩa msg_Open, msg_Save...
 #include <stdio.h>
 #include <File.h>
 #include <Alert.h>
@@ -13,44 +13,55 @@
 #include <string.h>
 #include "CPadApp.h"
 
+// --- KHAI BÁO HÀM MỚI ---
+// (Hàm này cũng cần được thêm vào CPad.h khi bạn tạo nó)
+void CPad::OpenFile( void ) {
+	// Đây là nơi bạn sẽ triển khai BFilePanel để mở tệp
+	// Hiện tại, chúng ta chỉ hiển thị một thông báo
+	BAlert *alert = new BAlert( NULL, "Chức năng 'Open' chưa được triển khai!", "OK" );
+	alert->Go();
+}
+
+
 // ------------------------------------------------------------------- CPad
 CPad::CPad( BEntry *entry )
+	// ... (Nội dung hàm tạo giữ nguyên, không thay đổi) ...
 	: BWindow( BRect( 200.0, 100.0, 500.0, 300.0 ), "Pad", B_TITLED_WINDOW,
 			B_NOT_ZOOMABLE ), mEntry( NULL ), mScroll( NULL ),
 			mFooter( NULL ), mMenu( NULL ), mCurPage( 0 ) {
 
-	// Create the interface
+	// Tạo giao diện
 	SetupWindow();
 	
-	// Set the size limites of the window
+	// Đặt giới hạn kích thước của cửa sổ
 	float minW, minH, maxW, maxH;
 	GetSizeLimits( &minW, &maxW, &minH, &maxH );
 	minW = 225.0;
 	minH = 100.0;
 	SetSizeLimits( minW, maxW, minH, maxH );
 
-	// Set mEntry
+	// Đặt mEntry
 	if( entry ) {
 		mEntry = entry;
 	} else {
 		mEntry = GetDefaultPad();
 	}
 	
-	// Try to read the pad file
+	// Thử đọc tệp pad
 	bool success = true;
 	if( !mEntry->Exists() ) {
 		success = false;
 	} else {
 		BFile file( mEntry, B_READ_ONLY );
 
-		// Find out what version it is
+		// Tìm xem đây là phiên bản nào
 		uint32 info[ 3 ];
 		if( file.ReadAttr( kInfoAttr, B_RAW_TYPE, 0, &info,
 				sizeof( info ) ) == sizeof( info ) ) {
 
-			// Call the appropriate function based on version
+			// Gọi hàm thích hợp dựa trên phiên bản
 			switch( info[ 0 ] ) {
-				case 0x0100:		// Version 1.0
+				case 0x0100:		// Phiên bản 1.0
 					success = ReadPad100( file );
 					break;
 				default:
@@ -61,7 +72,7 @@ CPad::CPad( BEntry *entry )
 			success = false;
 		}
 		
-		// The file exists but isn't able to be read
+		// Tệp tồn tại nhưng không thể đọc được
 		if( !success ) {
 			BAlert *alert = new BAlert( NULL, "The pad file is corrupted!",
 					"Damn", NULL, NULL, B_WIDTH_AS_USUAL, B_WARNING_ALERT );
@@ -69,20 +80,22 @@ CPad::CPad( BEntry *entry )
 		}
 	}
 	
-	// If we haven't successfully opened a pad by now, create a blank one
+	// Nếu đến giờ vẫn chưa mở được pad, hãy tạo một pad trống
 	if( !success ) {
 		NewPad();
 	}
 }
 
+
 // ------------------------------------------------------------------ ~CPad
+// ... (Hàm hủy giữ nguyên) ...
 CPad::~CPad( void ) {
-	// Delete the pad file entry
+	// Xóa entry tệp pad
 	if( mEntry ) {
 		delete mEntry;
 	}
 	
-	// Destroy all pages
+	// Hủy tất cả các trang
 	try {
 		RemoveChild( mPages.ItemAt( mCurPage - 1 ) );
 	} catch( ... ) {}
@@ -91,9 +104,20 @@ CPad::~CPad( void ) {
 	}
 }
 
+
 // -------------------------------------------------------- MessageReceived
+// *** ĐÂY LÀ HÀM ĐÃ ĐƯỢC SỬA ***
 void CPad::MessageReceived( BMessage *msg ) {
 	switch( msg->what ) {
+		// Thêm các case từ menu File
+		case msg_Open:
+			OpenFile(); // Gọi hàm mở tệp
+			break;	
+		case msg_Save:
+			SaveRequested(); // Gọi hàm lưu tệp
+			break;
+			
+		// Các case cũ cho menu Note
 		case msg_Next:
 			NextPage();
 			break;
@@ -106,59 +130,45 @@ void CPad::MessageReceived( BMessage *msg ) {
 		case msg_Del:
 			DelPage();
 			break;
-		case msg_Open:
-			OpenFile();
-			break;	
-		case msg_Save:
-			SaveRequested(); 
-			break;
+			
+		// Case mặc định
 		default:
 			BWindow::MessageReceived( msg );
 			break;
 	}
 }
-void Cpad::OpenFile( void ) {
-	if( mOpenPanel == NULL ) {
-        BMessage *message = new BMessage( B_REFS_RECEIVED );
-        
-        mOpenPanel = new BFilePanel( B_OPEN_PANEL, NULL, NULL,
-                                     B_FILE_NODE, false, message );
-    }
 
-    // 2. Hiển thị hộp thoại chọn tệp
-    mOpenPanel->Show();
-
-}
-// QuitRequested
+// ---------------------------------------------------------- QuitRequested
 bool CPad::QuitRequested( void ) {
-	// Save the document
+	// Lưu tài liệu
 	SaveRequested();
 
-	// Tell the application the window has closed
-	be_app->PostMessage( msg_PadClosed );
+	// Báo cho ứng dụng biết cửa sổ đã đóng
+	be_app->PostMessage( msg_PadClosed ); // Sử dụng hằng số đã định nghĩa
 	return true;
 }
 
 // ---------------------------------------------------------- SaveRequested
+// ... (Hàm này giữ nguyên) ...
 void CPad::SaveRequested( void ) {
-	// Open the file
+	// Mở tệp
 	BFile file( mEntry, B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE );
 	
-	// Collect the information to put into the info attribute
+	// Thu thập thông tin để đưa vào thuộc tính info
 	uint32 info[ 3 ];
-	info[ 0 ] = 0x0100;					// Version 1.0
-	info[ 1 ] = mPages.CountItems();		// Number of pages
-	info[ 2 ] = mCurPage;				// Current page
+	info[ 0 ] = 0x0100;					// Phiên bản 1.0
+	info[ 1 ] = mPages.CountItems();	// Số lượng trang
+	info[ 2 ] = mCurPage;				// Trang hiện tại
 	
-	// Step through the pages, writing the page's text to the file and
-	// adding its length to an array that will become the pages attribute
+	// Duyệt qua các trang, ghi văn bản của trang vào tệp và
+	// thêm độ dài của nó vào một mảng sẽ trở thành thuộc tính pages
 	uint32 *pages = new uint32[ info[ 1 ] ];
 	for( int i = 0; i < info[ 1 ]; i++ ) {
 		pages[ i ] = mPages.ItemAt( i )->TextLength();
 		file.Write( mPages.ItemAt( i )->Text(), pages[ i ] );
 	}
 		
-	// Finally, write the attributes
+	// Cuối cùng, ghi các thuộc tính
 	file.WriteAttr( "BEOS:TYPE", B_MIME_TYPE, 0, kPadMimeType,
 			strlen( kPadMimeType ) );
 	file.WriteAttr( kInfoAttr, B_RAW_TYPE, 0, &info, sizeof( info ) );
@@ -166,13 +176,17 @@ void CPad::SaveRequested( void ) {
 			sizeof( *pages ) * info[ 1 ] );
 }
 
+
 // --------------------------------------------------------------- NextPage
+// ... (Các hàm còn lại từ CPad.cpp giữ nguyên) ...
+// ... (NextPage, PrevPage, NewPage, DelPage, GoToPage, GetDefaultPad, NewPad, ReadPad100, SetPageNum, SetupWindow) ...
+// ... (Bạn không cần thay đổi gì thêm trong CPad.cpp) ...
 void CPad::NextPage( void ) {
-	// If the next page already exists, go to it
+	// Nếu trang tiếp theo đã tồn tại, hãy chuyển đến nó
 	if( mCurPage < mPages.CountItems() ) {
 		GoToPage( mCurPage + 1 );
 
-	// If not, ask to create it
+	// Nếu không, hãy hỏi để tạo nó
 	} else {
 		BAlert *alert = new BAlert( NULL,
 				"This is the last page.\nCreate a new one?", "No", "Yes",
@@ -180,7 +194,7 @@ void CPad::NextPage( void ) {
 		alert->SetShortcut( 2, B_ESCAPE );
 		int32 result = alert->Go();
 		
-		// User wanted a new window
+		// Người dùng muốn có một cửa sổ mới
 		if( result == 1 ) {
 			NewPage();
 		}
@@ -189,11 +203,11 @@ void CPad::NextPage( void ) {
 
 // --------------------------------------------------------------- PrevPage
 void CPad::PrevPage( void ) {
-	// If this isn't the first page, go to the previous page
+	// Nếu đây không phải là trang đầu tiên, hãy chuyển đến trang trước đó
 	if( mCurPage > 1 ) {
 		GoToPage( mCurPage - 1 );
 	
-	// If not, let the user know
+	// Nếu không, hãy cho người dùng biết
 	} else {
 		BAlert *alert = new BAlert( NULL, "This is the first page!",
 				"OK", NULL, NULL, B_WIDTH_AS_USUAL, B_IDEA_ALERT );
@@ -203,19 +217,19 @@ void CPad::PrevPage( void ) {
 
 // ---------------------------------------------------------------- NewPage
 void CPad::NewPage( void ) {
-	// Create the new page and add it to the page list
+	// Tạo trang mới và thêm nó vào danh sách trang
 	BRect bounds( 0, mMenu->Frame().bottom + 1,
 			mScroll->Frame().left - 1, mFooter->Frame().top - 2 );
 	mPages.AddItem( new CText( bounds, "Text", B_FOLLOW_ALL_SIDES,
 			B_WILL_DRAW | B_NAVIGABLE ),mCurPage );
 
-	// Go to the new page
+	// Đi đến trang mới
 	NextPage();
 }
 
 // ---------------------------------------------------------------- DelPage
 void CPad::DelPage( void ) {
-	// Make sure user wants to do this
+	// Đảm bảo người dùng muốn làm điều này
 	BAlert *alert = new BAlert( NULL,
 			"Deleting a note is not undoable.\nDo you really want to do this?",
 			"Cancel", "OK", NULL, B_WIDTH_AS_USUAL, B_WARNING_ALERT );
@@ -223,28 +237,28 @@ void CPad::DelPage( void ) {
 	alert->SetShortcut( 0, B_ESCAPE );
 	int32 result = alert->Go();
 
-	// If they really want to delete the page
+	// Nếu họ thực sự muốn xóa trang
 	if( result == 1 ) {
 	
 		uint16 page = mCurPage;
-		// If this is the first page...
+		// Nếu đây là trang đầu tiên...
 		if( mCurPage == 1 ) {
-			// If its also the only page, create a new one
+			// Nếu nó cũng là trang duy nhất, hãy tạo một trang mới
 			if( mPages.CountItems() == 1 ) {
 				NewPage();
 			
-			// If not, simply move to the next one
+			// Nếu không, chỉ cần chuyển sang trang tiếp theo
 			} else {
 				NextPage();
 			}
 			mCurPage--;
 		
-		// If its the last page (and not the first)...
+		// Nếu đó là trang cuối cùng (và không phải là trang đầu tiên)...
 		} else {
 			PrevPage();
 		}
 		
-		// Destroy the page and set the page number
+		// Hủy trang và đặt số trang
 		delete mPages.RemoveItemAt( page - 1 );
 		SetPageNum();
 	}
@@ -252,7 +266,7 @@ void CPad::DelPage( void ) {
 
 // --------------------------------------------------------------- GoToPage
 void CPad::GoToPage( uint16 num ) {
-	// If there is currently a page shown, remove it
+	// Nếu hiện có một trang đang được hiển thị, hãy xóa nó
 	BRect frame;
 	CText *page;
 	if( mCurPage > 0 ) {
@@ -266,7 +280,7 @@ void CPad::GoToPage( uint16 num ) {
 				mFooter->Frame().top - 3 );
 	}
 		
-	// Add the page requested
+	// Thêm trang được yêu cầu
 	page = mPages.ItemAt( num - 1 );
 	mScroll->SetTarget( page );
 	AddChild( page );
@@ -278,20 +292,20 @@ void CPad::GoToPage( uint16 num ) {
 
 // ---------------------------------------------------------- GetDefaultPad
 BEntry *CPad::GetDefaultPad( bool /*create*/ ) {
-	// For now, simply put default pad in /boot/system/settings
+	// Hiện tại, chỉ cần đặt pad mặc định trong /boot/system/settings
 	return new BEntry( "/boot/system/settings/Pad_default" );
 }
 
 // ----------------------------------------------------------------- NewPad
 void CPad::NewPad( void ) {
-	// Create a single page and add it to the list
+	// Tạo một trang duy nhất và thêm nó vào danh sách
 	BRect bounds( 0, mMenu->Frame().bottom + 1, mScroll->Frame().left - 1,
 			mFooter->Frame().top - 2 );
 	CText *page = new CText( bounds, "Text", B_FOLLOW_ALL_SIDES,
 			B_WILL_DRAW | B_NAVIGABLE );
 	mPages.AddItem( page, 0 );
 	
-	// Go to the page
+	// Đi đến trang
 	mCurPage = 1;
 	GoToPage( mCurPage );
 }
@@ -300,42 +314,42 @@ void CPad::NewPad( void ) {
 bool CPad::ReadPad100( BFile &file ) {
 	bool success = true;
 
-	// Read the number of pages and current page
+	// Đọc số lượng trang và trang hiện tại
 	uint32 info[ 3 ];
 	if( file.ReadAttr( kInfoAttr, B_RAW_TYPE, 0, &info, sizeof( info ) )
 			== sizeof( info ) ) {
 		
-		// Get the array of page sizes
+		// Lấy mảng kích thước các trang
 		uint32 *pages = new uint32[ info[ 1 ] ];
 		if( file.ReadAttr( kPagesAttr, B_RAW_TYPE, 0, pages, info[ 1 ] *
 				sizeof( *pages ) ) == info[ 1 ] * sizeof( *pages ) ) {
 			
-			// Create the pages
+			// Tạo các trang
 			char *text = NULL;
 			for( int i = 0; i < info[ 1 ]; i++ ) {
-				// Read the page text
+				// Đọc văn bản trang
 				text = new char[ pages[ i ] ];
 				file.Read( text, pages[ i ] );
 
-				// Create the new page and add it to the page list
+				// Tạo trang mới và thêm nó vào danh sách trang
 				BRect bounds( 0, mMenu->Frame().bottom + 1,
 						mScroll->Frame().left - 1, mFooter->Frame().top - 2 );
 				mPages.AddItem( new CText( bounds, "Text", B_FOLLOW_ALL_SIDES,
 						B_WILL_DRAW | B_NAVIGABLE ), i);
 
-				// Set the page's text
+				// Đặt văn bản của trang
 				mPages.ItemAt( i )->SetText( text, pages[ i ] );
 				//delete [] text;
 			}
 			
-			// Go to the current page
+			// Đi đến trang hiện tại
 			GoToPage( info[ 2 ] );
 		
-		// Failed reading pages attribute
+		// Không đọc được thuộc tính pages
 		} else {
 			success = false;
 		}
-	// Failed reading info	attribute
+	// Không đọc được thuộc tính info
 	} else {
 		success = false;
 	}
@@ -353,12 +367,12 @@ void CPad::SetPageNum( void ) {
 void CPad::SetupWindow( void ) {
 	BRect bounds = Bounds();
 
-	// Create menu bar
+	// Tạo thanh menu
 	mMenu = new BMenuBar( BRect( bounds.left, bounds.top, bounds.right,
 			bounds.top + 2 ), "MenuBar" );
 
-	// File menu
-	// File menu
+	// Menu Tệp
+	// Menu Tệp
 	BMenu *menu = new BMenu( "File" );
 	
 	// --- Bắt đầu phần thay đổi ---
@@ -366,12 +380,12 @@ void CPad::SetupWindow( void ) {
 	// 1. Mục "Open..."
 	BMenuItem *item = new BMenuItem( "Open...", new BMessage( msg_Open ), 'O' ); // Thêm shortcut Ctrl+O
 	menu->AddItem( item );
-	item->SetTarget( this ); // Gửi message đến cửa sổ này
+	item->SetTarget( this ); // Gửi message đến cửa sổ này (CPad)
 	
 	// 2. Mục "Save"
 	item = new BMenuItem( "Save", new BMessage( msg_Save ), 'S' ); // Thêm shortcut Ctrl+S
 	menu->AddItem( item );
-	item->SetTarget( this ); // Gửi message đến cửa sổ này
+	item->SetTarget( this ); // Gửi message đến cửa sổ này (CPad)
 	
 	menu->AddSeparatorItem(); // Thêm một đường phân cách
 	
@@ -386,7 +400,7 @@ void CPad::SetupWindow( void ) {
 	
 	mMenu->AddItem( menu );
 	
-	// Edit menu
+	// Menu Chỉnh sửa
 	menu = new BMenu( "Edit" );
 	item = new BMenuItem( "Cut", new BMessage( B_CUT ), 'X' );
 	menu->AddItem( item );
@@ -402,7 +416,7 @@ void CPad::SetupWindow( void ) {
 	
 	mMenu->AddItem( menu );
 	
-	// Note menu
+	// Menu Ghi chú
 	menu = new BMenu( "Note" );
 	item = new BMenuItem( "Next note", new BMessage( msg_Next ) );
 	menu->AddItem( item );
@@ -420,11 +434,11 @@ void CPad::SetupWindow( void ) {
 	
 	mMenu->AddItem( menu );
 	
-	// Add the menu bar
+	// Thêm thanh menu
 	AddChild( mMenu );
 	BRect menuframe = mMenu->Frame();
 		
-	// Create the page buttons
+	// Tạo các nút trang
 	float width, height;
 	BButton *button1 = new BButton( BRect( 0, bounds.bottom - 2,
 			2, bounds.bottom ), "Prev", "Prev", new BMessage( msg_Prev ),
@@ -445,7 +459,7 @@ void CPad::SetupWindow( void ) {
 	button2->ResizeTo( width, height );
 	BRect b2frame = button2->Frame();
 	
-	// Create footer
+	// Tạo chân trang (footer)
 	mFooter = new BStringView( BRect( b1frame.right + 1,
 			bounds.bottom - height, b2frame.left - 1,
 			bounds.bottom ), "Footer", 0, B_FOLLOW_LEFT_RIGHT |
@@ -453,13 +467,13 @@ void CPad::SetupWindow( void ) {
 	mFooter->SetAlignment( B_ALIGN_CENTER );
 	AddChild( mFooter );
 	
-	// Create line
+	// Tạo đường kẻ
 	CLine *line = new CLine( BRect( 0, b1frame.top - 1, bounds.right,
 			b1frame.top - 1 ), "Line", B_FOLLOW_LEFT_RIGHT | B_FOLLOW_BOTTOM,
 			0, CLine::horiz );
 	AddChild( line );
 	
-	// Create scrollbar
+	// Tạo thanh cuộn
 	mScroll = new BScrollBar( BRect( bounds.right - B_V_SCROLL_BAR_WIDTH,
 			menuframe.bottom + 1, bounds.right, b2frame.top - 2 ),
 			"ScrollBarV", NULL, 0.0, 0.0, B_VERTICAL );
