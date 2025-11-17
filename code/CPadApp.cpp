@@ -9,10 +9,8 @@
 
 // ---------------------------------------------------------------- CPadApp
 CPadApp::CPadApp( void )
-	: BApplication( "application/x-jessehall-pad" )
-{
-	mPad = NULL;
-	mIgnorePadClosed = false;
+	: BApplication( "application/x-jessehall-pad" ), mPad( NULL ),
+			mIgnorePadClosed( false ) {
 }
 
 // --------------------------------------------------------------- ~CPadApp
@@ -26,14 +24,16 @@ void CPadApp::AboutRequested( void ) {
 }
 
 // -------------------------------------------------------- MessageReceived
-void CPadApp::MessageReceived( BMessage *msg ) {
+void CPad::MessageReceived( BMessage *msg ) {
 	switch( msg->what ) {
-		case msg_PadClosed:
-			if( !mIgnorePadClosed ) {
-				Quit();
-			} else {
-				mIgnorePadClosed = false;
-			}
+		case msg_Open:
+			OpenFile();
+			break;	
+		case msg_Save:
+			SaveRequested(); 
+			break;
+		case msg_Next:
+			NextPage();
 			break;
 		default:
 			BApplication::MessageReceived( msg );
