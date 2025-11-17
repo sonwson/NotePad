@@ -106,13 +106,30 @@ void CPad::MessageReceived( BMessage *msg ) {
 		case msg_Del:
 			DelPage();
 			break;
+		case msg_Open:
+			OpenFile();
+			break;	
+		case msg_Save:
+			SaveRequested(); 
+			break;
 		default:
 			BWindow::MessageReceived( msg );
 			break;
 	}
 }
+void Cpad::OpenFile( void ) {
+	if( mOpenPanel == NULL ) {
+        BMessage *message = new BMessage( B_REFS_RECEIVED );
+        
+        mOpenPanel = new BFilePanel( B_OPEN_PANEL, NULL, NULL,
+                                     B_FILE_NODE, false, message );
+    }
 
-// ---------------------------------------------------------- QuitRequested
+    // 2. Hiển thị hộp thoại chọn tệp
+    mOpenPanel->Show();
+
+}
+// QuitRequested
 bool CPad::QuitRequested( void ) {
 	// Save the document
 	SaveRequested();
